@@ -216,3 +216,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Environnement virtuel et cache
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Fichiers de données et logs
+logs/*.db
+data/samples/*.png
+data/samples/*.jpg
+data/samples/*.dcm

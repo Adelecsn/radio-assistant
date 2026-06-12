@@ -1,0 +1,13 @@
+﻿torch
+transformers
+Pillow
+opencv-python
+pandas
+scikit-learn
+gradio
+fastapi
+uvicorn
+pydantic
+sqlite-utils
+jupyter
+python-dotenv
