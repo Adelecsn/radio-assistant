@@ -221,6 +221,7 @@ __marimo__/
 
 # Données, modèles et sorties locales du projet
 /reference/
+/data/external/
 /data/raw/
 /data/processed/
 /data/predictions/

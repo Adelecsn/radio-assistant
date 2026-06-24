@@ -174,6 +174,28 @@ Placer les images autorisées dans :
 data/raw/
 ```
 
+Pour le dataset demandé dans le planning, télécharger RSNA Pneumonia depuis la
+source officielle/Kaggle, puis le décompresser hors Git dans :
+
+```text
+data/external/rsna-pneumonia/
+```
+
+Extraire ensuite un échantillon local compatible avec notre pipeline :
+
+```bash
+python -m src.ingest.rsna_extract \
+  --rsna-dir data/external/rsna-pneumonia \
+  --output-dir data/raw/rsna_sample \
+  --labels-csv data/raw/rsna_sample_labels.csv \
+  --source-config data/source.local.json \
+  --per-class 10
+```
+
+Cette commande copie un nombre limité de DICOM dans `data/raw/rsna_sample/`,
+crée les labels locaux et remplit la provenance RSNA dans
+`data/source.local.json`.
+
 Optionnellement, préparer un fichier de labels en suivant l'exemple :
 
 ```bash
@@ -189,11 +211,11 @@ Transformer les images brutes en PNG prétraités et créer le manifeste :
 
 ```bash
 python -m src.ingest \
-  --input-dir data/raw \
+  --input-dir data/raw/rsna_sample \
   --output-dir data/processed \
   --manifest data/manifests/ingest_manifest.csv \
   --source-config data/source.local.json \
-  --labels-csv data/raw/labels.csv
+  --labels-csv data/raw/rsna_sample_labels.csv
 ```
 
 Si tu n'as pas encore de fichier `labels.csv`, lancer la même commande sans
@@ -266,6 +288,12 @@ Afficher les options de l'ingestion :
 
 ```bash
 make ingest-help
+```
+
+Afficher les options d'extraction RSNA :
+
+```bash
+make rsna-extract-help
 ```
 
 Afficher les options de l'inférence :

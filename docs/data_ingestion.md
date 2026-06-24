@@ -21,6 +21,44 @@ Copier `data/source.example.json` vers un fichier local et remplacer chaque
 valeur générique par les informations exactes de la source. Pour importer les
 labels, préparer un CSV conforme à `data/labels.example.csv`.
 
+## Source RSNA Pneumonia
+
+Le planning projet demande de partir du dataset RSNA Pneumonia. Télécharger le
+dataset depuis la source officielle, accepter les conditions d'utilisation, puis
+le décompresser hors Git, par exemple dans :
+
+```text
+data/external/rsna-pneumonia/
+```
+
+Le dossier doit contenir au minimum :
+
+```text
+stage_2_train_images/
+stage_2_train_labels.csv
+stage_2_detailed_class_info.csv
+```
+
+Ensuite, extraire un petit échantillon équilibré vers `data/raw/` :
+
+```bash
+python -m src.ingest.rsna_extract \
+  --rsna-dir data/external/rsna-pneumonia \
+  --output-dir data/raw/rsna_sample \
+  --labels-csv data/raw/rsna_sample_labels.csv \
+  --source-config data/source.local.json \
+  --per-class 10
+```
+
+La conversion de classes utilisée est :
+
+- `Lung Opacity` ou `Target=1` -> `suspected_opacity` ;
+- `Normal` -> `normal` ;
+- `No Lung Opacity / Not Normal` -> `uncertain`.
+
+Le fichier `data/raw/rsna_sample_selected_cases.csv` reste local et permet de
+tracer les `patientId` pseudonymisés RSNA utilisés dans l'échantillon.
+
 ## Commande
 
 ```bash

@@ -14,6 +14,7 @@ from pydicom.uid import ExplicitVRLittleEndian, SecondaryCaptureImageStorage, ge
 from src.ingest.config import SourceConfig
 from src.ingest.images import load_image
 from src.ingest.pipeline import ingest_directory
+from src.ingest.rsna import extract_rsna_sample
 
 
 def source_config() -> SourceConfig:
@@ -187,3 +188,66 @@ def test_ingestion_cli_runs_end_to_end(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["processed"] == 1
     assert manifest.exists()
+
+
+def test_rsna_sample_extraction_writes_pipeline_inputs(tmp_path: Path) -> None:
+    rsna = tmp_path / "rsna"
+    images = rsna / "stage_2_train_images"
+    images.mkdir(parents=True)
+    patient_ids = {
+        "normal-id": ("0", "Normal"),
+        "opacity-id": ("1", "Lung Opacity"),
+        "uncertain-id": ("0", "No Lung Opacity / Not Normal"),
+    }
+    for patient_id in patient_ids:
+        (images / f"{patient_id}.dcm").write_bytes(f"dicom-{patient_id}".encode())
+
+    with (rsna / "stage_2_train_labels.csv").open("w", encoding="utf-8", newline="") as stream:
+        writer = csv.DictWriter(
+            stream,
+            fieldnames=["patientId", "x", "y", "width", "height", "Target"],
+        )
+        writer.writeheader()
+        for patient_id, (target, _) in patient_ids.items():
+            writer.writerow(
+                {
+                    "patientId": patient_id,
+                    "x": "",
+                    "y": "",
+                    "width": "",
+                    "height": "",
+                    "Target": target,
+                }
+            )
+
+    with (rsna / "stage_2_detailed_class_info.csv").open(
+        "w", encoding="utf-8", newline=""
+    ) as stream:
+        writer = csv.DictWriter(stream, fieldnames=["patientId", "class"])
+        writer.writeheader()
+        for patient_id, (_, class_name) in patient_ids.items():
+            writer.writerow({"patientId": patient_id, "class": class_name})
+
+    labels_csv = tmp_path / "raw" / "labels.csv"
+    source_config = tmp_path / "source.local.json"
+    selected_cases = tmp_path / "raw" / "selected_cases.csv"
+    result = extract_rsna_sample(
+        rsna,
+        tmp_path / "raw" / "rsna_sample",
+        labels_csv=labels_csv,
+        source_config=source_config,
+        selected_cases_csv=selected_cases,
+        per_class=1,
+        seed=1,
+    )
+    rows = read_manifest(labels_csv)
+
+    assert result.selected == 3
+    assert sorted(row["label"] for row in rows) == [
+        "normal",
+        "suspected_opacity",
+        "uncertain",
+    ]
+    assert source_config.exists()
+    assert "RSNA Pneumonia" in source_config.read_text(encoding="utf-8")
+    assert selected_cases.exists()
