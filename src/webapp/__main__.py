@@ -1,0 +1,41 @@
+"""Run the local web dashboard."""
+
+from __future__ import annotations
+
+import argparse
+
+from .app import create_app
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run the Radio Assistant local dashboard.")
+    parser.add_argument(
+        "--predictions-dir",
+        default="data/predictions/baseline_v1",
+        help="Directory produced by python -m src.inference.",
+    )
+    parser.add_argument(
+        "--db-path",
+        default="logs/webapp.sqlite",
+        help="SQLite database used to log local consultations.",
+    )
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8000)
+    return parser
+
+
+def main() -> None:
+    args = build_parser().parse_args()
+    try:
+        import uvicorn
+    except ImportError as error:
+        raise RuntimeError(
+            "uvicorn n'est pas installé. Installe requirements.txt pour lancer la webapp."
+        ) from error
+
+    app = create_app(predictions_dir=args.predictions_dir, db_path=args.db_path)
+    uvicorn.run(app, host=args.host, port=args.port)
+
+
+if __name__ == "__main__":
+    main()

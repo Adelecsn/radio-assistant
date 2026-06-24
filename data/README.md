@@ -17,3 +17,7 @@ Le pipeline et sa commande sont documentés dans
 [`docs/data_ingestion.md`](../docs/data_ingestion.md). Utiliser
 `source.example.json` et `labels.example.csv` comme contrats, jamais comme
 informations réelles de provenance.
+
+Les sorties d'inférence locales sont écrites dans `data/predictions/`, ignoré
+par Git. Ne versionner que des résultats agrégés et relus, jamais un export brut
+contenant des chemins locaux ou une donnée potentiellement sensible.

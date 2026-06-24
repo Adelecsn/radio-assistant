@@ -34,11 +34,20 @@ Le pôle IA charge le modèle, applique un prompt versionné, transforme la rép
 en dictionnaire et applique les règles d'incertitude. Il ne dépend ni de Gradio
 ni de SQLite.
 
+La première implémentation est une baseline déterministe dans `src/inference`.
+Elle extrait des mesures simples de l'image prétraitée, applique des
+hyperparamètres explicites et produit un JSON conforme au contrat. Elle sert de
+socle d'intégration avant un modèle multimodal réel.
+
 ### Webapp
 
 Le pôle Web reçoit l'image, orchestre les deux modules, affiche le warning et
 journalise le run. L'interface ne corrige pas silencieusement une réponse
 invalide : elle la fait basculer vers `uncertain` ou affiche une erreur contrôlée.
+
+La première webapp lit les sorties JSON déjà produites par l'inférence. Elle
+affiche un dashboard local, expose quelques routes API et enregistre les vues de
+cas dans SQLite. Cette séparation évite de relancer le modèle à chaque affichage.
 
 ### Contrat partagé
 

@@ -39,6 +39,39 @@ python -m src.ingest \
 La préparation de la source et les contrôles humains obligatoires sont décrits
 dans [`docs/data_ingestion.md`](docs/data_ingestion.md).
 
+## Étape 2 - Extraction et JSON
+
+Le second pipeline lit le manifeste d'ingestion, charge les PNG prétraités,
+calcule des mesures d'image reproductibles, applique une baseline prudente et
+écrit des sorties JSON validées par le contrat partagé.
+
+```bash
+python -m src.inference \
+  --manifest data/manifests/ingest_manifest.csv \
+  --output-dir data/predictions/baseline_v1
+```
+
+Les prédictions par cas sont écrites dans `cases/`, l'index dans
+`predictions.jsonl` et les hyperparamètres dans `run_metadata.json`. Cette
+baseline sert à tester le workflow IA; elle ne constitue pas un modèle médical.
+La procédure est détaillée dans [`docs/inference.md`](docs/inference.md).
+
+## Étape 3 - Webapp et dataviz
+
+La troisième brique lit les sorties JSON de l'inférence, affiche un dashboard
+local et journalise les consultations dans SQLite sans donnée patient.
+
+```bash
+make webapp-setup
+python -m src.webapp \
+  --predictions-dir data/predictions/baseline_v1 \
+  --db-path logs/webapp.sqlite
+```
+
+Interface par défaut : <http://127.0.0.1:8000>. Le dashboard montre le warning,
+les compteurs par classe, la qualité image, les cas, les features et le JSON
+complet par cas. Les détails sont dans [`docs/webapp.md`](docs/webapp.md).
+
 ## Organisation
 
 ```text
@@ -63,30 +96,213 @@ s'inspire du dépôt pédagogique fourni pour la traçabilité et l'évaluation,
 reprendre son organisation monolithique ni son prédicteur jouet fondé sur les noms
 de fichiers. Voir [`docs/reference_analysis.md`](docs/reference_analysis.md).
 
-## Installation
+## Installation et commandes
+
+### 1. Préparer l'environnement
+
+Créer l'environnement Python local du projet :
 
 ```bash
 python3 -m venv .venv
+```
+
+Activer l'environnement :
+
+```bash
 source .venv/bin/activate
+```
+
+Mettre `pip` à jour :
+
+```bash
 python -m pip install --upgrade pip
+```
+
+Installer toutes les dépendances du projet, y compris les dépendances IA et web :
+
+```bash
 pip install -r requirements.txt
 ```
 
-Pour contribuer sans installer les dépendances IA lourdes :
+Pour travailler uniquement sur les tests sans installer les dépendances IA
+lourdes, utiliser plutôt :
+
+```bash
+make setup
+```
+
+`make setup` crée `.venv` avec `python3` si nécessaire et installe seulement les
+dépendances de test.
+
+### 2. Vérifier que le projet fonctionne
+
+Lancer les tests automatiques :
 
 ```bash
 make test
 ```
 
-Cette commande crée automatiquement `.venv` avec `python3`, installe les
-dépendances de test et lance `pytest`. Sans `make`, utiliser directement :
+Lancer les tests puis vérifier que les fichiers Python compilent correctement :
 
 ```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements-test.txt
-.venv/bin/python -m pytest -q
-.venv/bin/python -m compileall -q src eval tests
+make check
 ```
+
+Ces commandes valident le comportement logiciel du pipeline. Elles ne valident
+pas une performance médicale.
+
+### 3. Préparer les données d'entrée
+
+Copier l'exemple de configuration de source vers un fichier local :
+
+```bash
+cp data/source.example.json data/source.local.json
+```
+
+Modifier ensuite `data/source.local.json` avec la vraie provenance du dataset :
+nom, version, licence, URL d'accès et autorisation de redistribution.
+
+Créer les dossiers locaux de données :
+
+```bash
+mkdir -p data/raw data/processed data/manifests data/predictions logs
+```
+
+Placer les images autorisées dans :
+
+```text
+data/raw/
+```
+
+Optionnellement, préparer un fichier de labels en suivant l'exemple :
+
+```bash
+cp data/labels.example.csv data/raw/labels.csv
+```
+
+Les dossiers `data/raw/`, `data/processed/`, `data/predictions/` et les bases
+SQLite restent hors Git.
+
+### 4. Lancer l'ingestion
+
+Transformer les images brutes en PNG prétraités et créer le manifeste :
+
+```bash
+python -m src.ingest \
+  --input-dir data/raw \
+  --output-dir data/processed \
+  --manifest data/manifests/ingest_manifest.csv \
+  --source-config data/source.local.json \
+  --labels-csv data/raw/labels.csv
+```
+
+Si tu n'as pas encore de fichier `labels.csv`, lancer la même commande sans
+`--labels-csv` :
+
+```bash
+python -m src.ingest \
+  --input-dir data/raw \
+  --output-dir data/processed \
+  --manifest data/manifests/ingest_manifest.csv \
+  --source-config data/source.local.json
+```
+
+Résultat attendu :
+
+- images prétraitées dans `data/processed/images/` ;
+- manifeste dé-identifié dans `data/manifests/ingest_manifest.csv`.
+
+### 5. Lancer l'inférence
+
+Lire le manifeste d'ingestion, analyser les images prétraitées et produire les
+sorties JSON :
+
+```bash
+python -m src.inference \
+  --manifest data/manifests/ingest_manifest.csv \
+  --output-dir data/predictions/baseline_v1
+```
+
+Résultat attendu :
+
+- `data/predictions/baseline_v1/cases/<case_id>.json` ;
+- `data/predictions/baseline_v1/predictions.jsonl` ;
+- `data/predictions/baseline_v1/run_metadata.json`.
+
+### 6. Lancer la webapp
+
+Installer les dépendances web minimales :
+
+```bash
+make webapp-setup
+```
+
+Lancer le dashboard avec les chemins par défaut :
+
+```bash
+make webapp-run
+```
+
+Ou lancer explicitement l'application :
+
+```bash
+python -m src.webapp \
+  --predictions-dir data/predictions/baseline_v1 \
+  --db-path logs/webapp.sqlite
+```
+
+Ouvrir ensuite dans le navigateur :
+
+```text
+http://127.0.0.1:8000
+```
+
+Pour arrêter la webapp, revenir dans le terminal où elle tourne et appuyer sur
+`Ctrl+C`.
+
+### 7. Commandes d'aide
+
+Afficher les options de l'ingestion :
+
+```bash
+make ingest-help
+```
+
+Afficher les options de l'inférence :
+
+```bash
+make inference-help
+```
+
+Afficher les options de la webapp :
+
+```bash
+make webapp-help
+```
+
+### 8. Commandes Git utiles
+
+Voir les fichiers modifiés :
+
+```bash
+git status --short
+```
+
+Créer un commit :
+
+```bash
+git add README.md docs/ src/ tests/ Makefile requirements*.txt
+git commit -m "message clair du changement"
+```
+
+Pousser vers GitHub :
+
+```bash
+git push origin main
+```
+
+Avant un commit, vérifier qu'aucune donnée sensible ou image médicale n'a été
+ajoutée par erreur.
 
 ## Workflow
 

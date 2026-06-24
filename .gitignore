@@ -223,6 +223,7 @@ __marimo__/
 /reference/
 /data/raw/
 /data/processed/
+/data/predictions/
 /data/source.local.json
 /models/
 /eval/outputs/
