@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://radio-assistant.local/schemas/prediction-v1.json",
+  "title": "Radio Assistant prediction v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "image_quality",
+    "predicted_class",
+    "confidence_score",
+    "visual_findings",
+    "justification",
+    "limitations",
+    "warning",
+    "model_version",
+    "prompt_version",
+    "inference_latency_ms"
+  ],
+  "properties": {
+    "image_quality": {"enum": ["good", "poor"]},
+    "predicted_class": {
+      "enum": ["normal", "suspected_opacity", "uncertain"]
+    },
+    "confidence_score": {"type": "number", "minimum": 0, "maximum": 1},
+    "visual_findings": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "justification": {"type": "string", "minLength": 1},
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "warning": {
+      "const": "Prototype pédagogique. Non destiné au diagnostic. Validation par un professionnel qualifié requise."
+    },
+    "model_version": {"type": "string", "minLength": 1},
+    "prompt_version": {"type": "string", "minLength": 1},
+    "inference_latency_ms": {"type": "integer", "minimum": 0}
+  }
+}

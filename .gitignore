@@ -218,6 +218,22 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Environnement virtuel et cache
+
+# Données, modèles et sorties locales du projet
+/reference/
+/data/raw/
+/data/processed/
+/data/source.local.json
+/models/
+/eval/outputs/
+/tmp_uploads/
+/logs/*.sqlite
+/logs/*.sqlite3
+/logs/*.db
+*.safetensors
+*.ckpt
+*.pt
+.DS_Store
 venv/
 __pycache__/
 *.pyc

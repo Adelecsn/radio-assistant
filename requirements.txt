@@ -1,6 +1,8 @@
-﻿torch
+torch
 transformers
 Pillow
+numpy
+pydicom
 opencv-python
 pandas
 scikit-learn
