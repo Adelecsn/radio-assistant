@@ -46,7 +46,11 @@ Options :
 - `/cases/{case_id}` : détail d'un cas avec warning, prédiction, features et
   JSON complet ;
 - `/cases/{case_id}/image` : image PNG prétraitée si elle est disponible ;
+- `/errors` : revue visuelle des erreurs avec les radios ;
+- `/report` : rapport HTML d'évaluation ;
 - `/api/summary` : résumé JSON ;
+- `/api/evaluation` : rapport d'évaluation JSON ;
+- `/api/evaluation/errors.csv` : registre d'erreurs CSV ;
 - `/api/cases` : liste JSON des cas.
 
 ## Données affichées
@@ -58,6 +62,9 @@ Le dashboard affiche :
 - latence moyenne ;
 - répartition par classe prédite ;
 - répartition par qualité image ;
+- accuracy, macro-F1, rappel/sensibilité et matrice de confusion si les labels
+  sont disponibles ;
+- erreurs à analyser dans le registre ;
 - nombre de consultations loggées ;
 - métadonnées du run et hyperparamètres.
 
@@ -69,7 +76,6 @@ versions modèle/prompt et date de consultation.
 
 - pas encore d'upload direct depuis l'interface ;
 - pas encore de comparaison avancée baseline vs modèle amélioré ;
-- pas encore de dashboard d'évaluation complet avec matrice de confusion ;
 - dépend des sorties générées au préalable par `src.inference`.
 
 ## Critère de fin de l'étape 3

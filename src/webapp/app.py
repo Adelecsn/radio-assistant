@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .render import render_case_detail, render_dashboard
+from .render import (
+    error_register_csv,
+    render_case_detail,
+    render_dashboard,
+    render_error_review,
+    render_report,
+)
 from .repository import PredictionRepository
 from .storage import init_db, log_case_view, read_log_summary
 
@@ -16,7 +22,7 @@ def create_app(
     """Create the local dashboard application."""
     try:
         from fastapi import FastAPI, HTTPException
-        from fastapi.responses import FileResponse, HTMLResponse
+        from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
     except ImportError as error:
         raise RuntimeError(
             "Les dépendances web ne sont pas installées. "
@@ -41,10 +47,23 @@ def create_app(
     def dashboard() -> str:
         return render_dashboard(
             repository.summary(),
+            repository.evaluation(),
             repository.list_cases(),
             repository.metadata(),
             read_log_summary(database),
         )
+
+    @app.get("/errors", response_class=HTMLResponse)
+    def error_review() -> str:
+        cases = repository.list_cases()
+        return render_error_review(
+            repository.evaluation().get("errors", []),
+            {case.case_id: case for case in cases},
+        )
+
+    @app.get("/report", response_class=HTMLResponse)
+    def report() -> str:
+        return render_report(repository.evaluation(), repository.metadata())
 
     @app.get("/cases/{case_id}", response_class=HTMLResponse)
     def case_detail(case_id: str) -> str:
@@ -70,9 +89,18 @@ def create_app(
     def api_summary() -> dict[str, object]:
         return {
             "summary": repository.summary(),
+            "evaluation": repository.evaluation(),
             "logs": read_log_summary(database),
             "metadata": repository.metadata(),
         }
+
+    @app.get("/api/evaluation")
+    def api_evaluation() -> dict[str, object]:
+        return repository.evaluation()
+
+    @app.get("/api/evaluation/errors.csv", response_class=PlainTextResponse)
+    def api_error_register_csv() -> str:
+        return error_register_csv(repository.evaluation())
 
     @app.get("/api/cases")
     def api_cases() -> list[dict[str, object]]:

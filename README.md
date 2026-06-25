@@ -72,6 +72,32 @@ Interface par défaut : <http://127.0.0.1:8000>. Le dashboard montre le warning,
 les compteurs par classe, la qualité image, les cas, les features et le JSON
 complet par cas. Les détails sont dans [`docs/webapp.md`](docs/webapp.md).
 
+## Étape 4 - Évaluation
+
+L'évaluation lit les prédictions labellisées, calcule les métriques principales
+et génère un registre d'erreurs à relire humainement.
+
+```bash
+python -m eval.evaluate \
+  --predictions-dir data/predictions/baseline_v1 \
+  --output-dir eval/outputs/baseline_v1
+```
+
+Sorties générées :
+
+- `metrics_report.json` : accuracy, macro-F1, rappel/sensibilité et matrice de
+  confusion ;
+- `error_register.csv` : cas où la prédiction ne correspond pas au label.
+
+Ces métriques servent à analyser la baseline. Elles ne constituent pas une
+validation médicale.
+
+La baseline actuelle est `image-stat-baseline-v0.2`. Elle reste une baseline
+statistique non clinique, mais elle corrige le défaut initial où la classe
+`normal` n'était jamais prédite. Sur l'échantillon local RSNA de 30 cas, elle
+obtient environ 70 % d'accuracy et 70 % de macro-F1. Ces chiffres sont indicatifs
+et calculés sur un petit échantillon de démonstration.
+
 ## Organisation
 
 ```text
@@ -253,6 +279,27 @@ Résultat attendu :
 
 ### 6. Lancer la webapp
 
+Avant ou après le lancement de la webapp, générer le rapport d'évaluation :
+
+```bash
+make evaluate-run
+```
+
+Le dashboard calcule aussi les métriques à la volée et affiche la matrice de
+confusion quand les labels sont disponibles.
+
+Le rapport est disponible dans la webapp :
+
+```text
+http://127.0.0.1:8000/report
+```
+
+La revue visuelle des erreurs est disponible ici :
+
+```text
+http://127.0.0.1:8000/errors
+```
+
 Installer les dépendances web minimales :
 
 ```bash
@@ -300,6 +347,12 @@ Afficher les options de l'inférence :
 
 ```bash
 make inference-help
+```
+
+Afficher les options de l'évaluation :
+
+```bash
+make evaluate-help
 ```
 
 Afficher les options de la webapp :

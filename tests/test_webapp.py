@@ -9,7 +9,13 @@ from PIL import Image
 from src.contracts import WARNING_TEXT
 from src.inference import run_batch_inference
 from src.webapp import PredictionRepository, log_case_view, read_log_summary
-from src.webapp.render import render_case_detail, render_dashboard
+from src.webapp.render import (
+    error_register_csv,
+    render_case_detail,
+    render_dashboard,
+    render_error_review,
+    render_report,
+)
 
 
 def _normal_like_image(path: Path) -> None:
@@ -85,6 +91,7 @@ def test_dashboard_and_case_html_include_warning(tmp_path: Path) -> None:
 
     dashboard_html = render_dashboard(
         repository.summary(),
+        repository.evaluation(),
         cases,
         repository.metadata(),
         {"total_views": 0, "last_viewed_at": None, "views_by_class": {}},
@@ -93,5 +100,40 @@ def test_dashboard_and_case_html_include_warning(tmp_path: Path) -> None:
 
     assert WARNING_TEXT in dashboard_html
     assert "case_test" in dashboard_html
+    assert "Évaluation baseline" in dashboard_html
     assert WARNING_TEXT in case_html
     assert "JSON complet" in case_html
+
+
+def test_error_review_html_displays_error_images(tmp_path: Path) -> None:
+    output_dir = _build_predictions(tmp_path)
+    repository = PredictionRepository(output_dir)
+    case = repository.list_cases()[0]
+    errors = [
+        {
+            "case_id": case.case_id,
+            "ground_truth": "normal",
+            "predicted_class": "suspected_opacity",
+            "confidence_score": 0.8,
+            "error_type": "normal_as_suspected_opacity",
+        }
+    ]
+
+    html = render_error_review(errors, {case.case_id: case})
+
+    assert "Revue visuelle des erreurs" in html
+    assert f"/cases/{case.case_id}/image" in html
+    assert "normal_as_suspected_opacity" in html
+
+
+def test_report_html_and_error_csv_exports(tmp_path: Path) -> None:
+    output_dir = _build_predictions(tmp_path)
+    repository = PredictionRepository(output_dir)
+    evaluation = repository.evaluation()
+
+    report_html = render_report(evaluation, repository.metadata())
+    errors_csv = error_register_csv(evaluation)
+
+    assert "Rapport d'évaluation" in report_html
+    assert "/api/evaluation/errors.csv" in report_html
+    assert errors_csv.startswith("case_id,split,ground_truth")

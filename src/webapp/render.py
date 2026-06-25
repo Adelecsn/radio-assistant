@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import csv
 import html
 import json
+from io import StringIO
 from typing import Any
 
 from src.contracts import WARNING_TEXT
@@ -44,6 +46,107 @@ def _bar_svg(counts: dict[str, int], title: str) -> str:
     )
 
 
+def _percent(value: object) -> str:
+    if value is None:
+        return "n/a"
+    try:
+        return f"{float(value) * 100:.1f}%"
+    except (TypeError, ValueError):
+        return _esc(value)
+
+
+def _confusion_matrix_table(evaluation: dict[str, Any]) -> str:
+    classes = evaluation.get("classes", [])
+    matrix = evaluation.get("confusion_matrix", {})
+    if not classes or not matrix:
+        return "<p>Aucune matrice disponible : aucun label exploitable.</p>"
+
+    header = "<tr><th>Réel \\ Prédit</th>" + "".join(
+        f"<th>{_esc(class_name)}</th>" for class_name in classes
+    ) + "</tr>"
+    rows = []
+    for truth in classes:
+        cells = [f"<th>{_esc(truth)}</th>"]
+        for predicted in classes:
+            cells.append(f"<td>{_esc(matrix.get(truth, {}).get(predicted, 0))}</td>")
+        rows.append("<tr>" + "".join(cells) + "</tr>")
+    return '<div class="table-wrap"><table>' + header + "".join(rows) + "</table></div>"
+
+
+def _per_class_table(evaluation: dict[str, Any]) -> str:
+    per_class = evaluation.get("per_class", {})
+    if not per_class:
+        return "<p>Aucune métrique par classe disponible.</p>"
+
+    rows = []
+    for class_name, metrics in per_class.items():
+        rows.append(
+            "<tr>"
+            f"<td>{_esc(class_name)}</td>"
+            f"<td>{_esc(metrics.get('support'))}</td>"
+            f"<td>{_percent(metrics.get('precision'))}</td>"
+            f"<td>{_percent(metrics.get('recall_sensitivity'))}</td>"
+            f"<td>{_percent(metrics.get('f1'))}</td>"
+            "</tr>"
+        )
+    return (
+        '<div class="table-wrap"><table><thead><tr><th>Classe</th><th>Support</th><th>Précision</th>'
+        "<th>Rappel / sensibilité</th><th>F1</th></tr></thead><tbody>"
+        + "".join(rows)
+        + "</tbody></table></div>"
+    )
+
+
+def _error_table(evaluation: dict[str, Any], *, limit: int = 8) -> str:
+    errors = evaluation.get("errors", [])
+    if not errors:
+        return "<p>Aucune erreur sur les cas labellisés.</p>"
+
+    rows = []
+    for error in errors[:limit]:
+        rows.append(
+            "<tr>"
+            f"<td>{_esc(error.get('case_id'))}</td>"
+            f"<td>{_esc(error.get('ground_truth'))}</td>"
+            f"<td>{_esc(error.get('predicted_class'))}</td>"
+            f"<td>{_esc(error.get('confidence_score'))}</td>"
+            f"<td>{_esc(error.get('error_type'))}</td>"
+            "</tr>"
+        )
+    more = ""
+    if len(errors) > limit:
+        more = f'<p class="muted">+ {_esc(len(errors) - limit)} autres erreurs dans le registre.</p>'
+    return (
+        '<div class="table-wrap"><table><thead><tr><th>Cas</th><th>Label</th><th>Prédiction</th>'
+        "<th>Confiance</th><th>Type</th></tr></thead><tbody>"
+        + "".join(rows)
+        + "</tbody></table></div>"
+        + more
+    )
+
+
+def error_register_csv(evaluation: dict[str, Any]) -> str:
+    """Return the current evaluation errors as CSV text."""
+    fields = [
+        "case_id",
+        "split",
+        "ground_truth",
+        "predicted_class",
+        "confidence_score",
+        "error_type",
+        "image_quality",
+        "prompt_version",
+        "model_version",
+        "reviewer_comment",
+        "status",
+    ]
+    buffer = StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fields)
+    writer.writeheader()
+    writer.writerows(evaluation.get("errors", []))
+    return buffer.getvalue()
+
+
 def _page(title: str, body: str) -> str:
     return f"""<!doctype html>
 <html lang="fr">
@@ -76,17 +179,24 @@ def _page(title: str, body: str) -> str:
       border-radius: 14px;
       padding: 16px;
       box-shadow: 0 1px 4px rgba(21, 32, 59, 0.06);
+      overflow: hidden;
     }}
     .metric {{ display: block; font-size: 2rem; font-weight: 750; margin-top: 6px; }}
     table {{ width: 100%; border-collapse: collapse; background: white; border-radius: 14px; overflow: hidden; }}
     th, td {{ padding: 12px; border-bottom: 1px solid #e7ebf3; text-align: left; vertical-align: top; }}
     th {{ background: #edf1f8; font-size: 0.88rem; text-transform: uppercase; letter-spacing: 0.04em; }}
+    .table-wrap {{ max-width: 100%; overflow-x: auto; border-radius: 14px; }}
+    .table-wrap table {{ min-width: max-content; }}
+    .table-wrap th, .table-wrap td {{ white-space: nowrap; }}
     code, pre {{ background: #edf1f8; border-radius: 8px; }}
     pre {{ padding: 14px; overflow: auto; }}
     .chart rect {{ fill: #4a6cf0; }}
     .chart-label, .chart-count {{ font-size: 14px; fill: #172033; }}
     .muted {{ color: #667086; }}
     .image-preview {{ max-width: 100%; border-radius: 12px; border: 1px solid #dde2ee; }}
+    .error-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }}
+    .error-image {{ width: 100%; aspect-ratio: 1; object-fit: contain; background: #07101f; border-radius: 12px; }}
+    .badge {{ display: inline-block; padding: 4px 8px; border-radius: 999px; background: #edf1f8; margin: 3px 4px 3px 0; }}
   </style>
 </head>
 <body>
@@ -100,6 +210,7 @@ def _page(title: str, body: str) -> str:
 
 def render_dashboard(
     summary: dict[str, Any],
+    evaluation: dict[str, Any],
     cases: list[CaseRecord],
     metadata: dict[str, Any],
     log_summary: dict[str, Any],
@@ -119,6 +230,15 @@ def render_dashboard(
             f'{_esc(accuracy)} ({_esc(summary.get("labeled_cases"))} cas labellisés).</p>'
         )
 
+    evaluation_cards = f"""
+<section class="grid">
+  <div class="card">Accuracy<span class="metric">{_percent(evaluation.get("accuracy"))}</span></div>
+  <div class="card">Macro-F1<span class="metric">{_percent(evaluation.get("macro_f1"))}</span></div>
+  <div class="card">Macro-rappel<span class="metric">{_percent(evaluation.get("macro_recall_sensitivity"))}</span></div>
+  <div class="card">Erreurs à revoir<span class="metric">{_esc(len(evaluation.get("errors", [])))}</span></div>
+</section>
+"""
+
     rows = []
     for case in cases:
         prediction = case.prediction
@@ -134,10 +254,10 @@ def render_dashboard(
         )
 
     table = (
-        "<table><thead><tr><th>Cas</th><th>Classe</th><th>Confiance</th>"
+        '<div class="table-wrap"><table><thead><tr><th>Cas</th><th>Classe</th><th>Confiance</th>'
         "<th>Qualité</th><th>Split</th><th>Label</th></tr></thead><tbody>"
         + "".join(rows)
-        + "</tbody></table>"
+        + "</tbody></table></div>"
     )
     if not cases:
         table = "<p>Aucune prédiction trouvée. Lance d'abord <code>python -m src.inference</code>.</p>"
@@ -156,6 +276,21 @@ def render_dashboard(
     {_bar_svg(summary.get("by_quality", {}), "Répartition des qualités image")}
   </div>
 </section>
+<h2>Évaluation baseline</h2>
+{evaluation_cards}
+<section class="grid">
+  <div class="card">
+    <h3>Matrice de confusion</h3>
+    {_confusion_matrix_table(evaluation)}
+  </div>
+  <div class="card">
+    <h3>Métriques par classe</h3>
+    {_per_class_table(evaluation)}
+  </div>
+</section>
+<h3>Erreurs à analyser</h3>
+<p><a href="/errors">Voir les erreurs visuellement</a> · <a href="/report">Voir le rapport</a></p>
+{_error_table(evaluation)}
 <h2>Cas</h2>
 {table}
 <h2>Run</h2>
@@ -209,3 +344,80 @@ def render_case_detail(case: CaseRecord, *, image_url: str | None = None) -> str
 <pre>{_esc(json.dumps(prediction, ensure_ascii=False, indent=2))}</pre>
 """
     return _page(f"Cas {case.case_id}", body)
+
+
+def render_report(evaluation: dict[str, Any], metadata: dict[str, Any]) -> str:
+    """Render a compact evaluation report page."""
+    body = f"""
+<p><a href="/">Retour au dashboard</a></p>
+<h1>Rapport d'évaluation</h1>
+<p class="warning">{_esc(WARNING_TEXT)}</p>
+<section class="grid">
+  <div class="card">Cas évalués<span class="metric">{_esc(evaluation.get("evaluated_cases"))}</span></div>
+  <div class="card">Accuracy<span class="metric">{_percent(evaluation.get("accuracy"))}</span></div>
+  <div class="card">Macro-F1<span class="metric">{_percent(evaluation.get("macro_f1"))}</span></div>
+  <div class="card">Erreurs<span class="metric">{_esc(len(evaluation.get("errors", [])))}</span></div>
+</section>
+<section class="grid">
+  <div class="card">
+    <h2>Matrice de confusion</h2>
+    {_confusion_matrix_table(evaluation)}
+  </div>
+  <div class="card">
+    <h2>Métriques par classe</h2>
+    {_per_class_table(evaluation)}
+  </div>
+</section>
+<h2>Exports</h2>
+<ul>
+  <li><a href="/api/evaluation">Rapport JSON</a></li>
+  <li><a href="/api/evaluation/errors.csv">Registre d'erreurs CSV</a></li>
+</ul>
+<h2>Métadonnées du run</h2>
+<pre>{_esc(json.dumps(metadata, ensure_ascii=False, indent=2))}</pre>
+"""
+    return _page("Rapport d'évaluation", body)
+
+
+def render_error_review(
+    errors: list[dict[str, Any]],
+    cases_by_id: dict[str, CaseRecord],
+) -> str:
+    """Render visual review cards for prediction errors."""
+    cards = []
+    for error in errors:
+        case_id = str(error.get("case_id", ""))
+        case = cases_by_id.get(case_id)
+        if case is None:
+            continue
+        image_url = f"/cases/{_esc(case.case_id)}/image"
+        cards.append(
+            '<article class="card">'
+            f'<a href="/cases/{_esc(case.case_id)}">'
+            f'<img class="error-image" src="{image_url}" alt="Image du cas {_esc(case.case_id)}">'
+            "</a>"
+            f"<h2>{_esc(case.case_id)}</h2>"
+            f'<span class="badge">Réel: {_esc(error.get("ground_truth"))}</span>'
+            f'<span class="badge">Prédit: {_esc(error.get("predicted_class"))}</span>'
+            f'<span class="badge">Confiance: {_esc(error.get("confidence_score"))}</span>'
+            f"<p>Type erreur: <strong>{_esc(error.get('error_type'))}</strong></p>"
+            f'<p><a href="/cases/{_esc(case.case_id)}">Ouvrir le détail du cas</a></p>'
+            "</article>"
+        )
+
+    if not cards:
+        content = "<p>Aucune erreur à afficher visuellement.</p>"
+    else:
+        content = '<section class="error-grid">' + "".join(cards) + "</section>"
+
+    body = f"""
+<p><a href="/">Retour au dashboard</a></p>
+<h1>Revue visuelle des erreurs</h1>
+<p class="warning">{_esc(WARNING_TEXT)}</p>
+<p class="muted">
+  Ces images servent à analyser les erreurs du prototype. Elles ne constituent
+  pas une validation clinique.
+</p>
+{content}
+"""
+    return _page("Revue visuelle des erreurs", body)

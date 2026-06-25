@@ -8,6 +8,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from eval.metrics import evaluate_records
+
 
 @dataclass(frozen=True)
 class CaseRecord:
@@ -104,6 +106,20 @@ class PredictionRepository:
                 }
             ),
         }
+
+    def evaluation(self) -> dict[str, Any]:
+        """Return evaluation metrics for labeled cases in the predictions directory."""
+        return evaluate_records(
+            [
+                {
+                    "case_id": case.case_id,
+                    "split": case.split,
+                    "label": case.label,
+                    "prediction": case.prediction,
+                }
+                for case in self.list_cases()
+            ]
+        )
 
     def resolve_image_path(self, case: CaseRecord) -> Path | None:
         if not case.processed_path:

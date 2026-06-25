@@ -57,7 +57,7 @@ def test_predict_image_returns_valid_contract(tmp_path: Path) -> None:
 
     assert is_valid_prediction(result.prediction)
     assert result.prediction["image_quality"] == "good"
-    assert result.prediction["model_version"] == "image-stat-baseline-v0.1"
+    assert result.prediction["model_version"] == "image-stat-baseline-v0.2"
     assert "std_intensity" in result.features
 
 

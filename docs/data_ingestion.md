@@ -59,6 +59,12 @@ La conversion de classes utilisée est :
 Le fichier `data/raw/rsna_sample_selected_cases.csv` reste local et permet de
 tracer les `patientId` pseudonymisés RSNA utilisés dans l'échantillon.
 
+Une revue visuelle rapide de l'échantillon local prétraité n'a pas montré de nom
+patient ni de date évidente gravés dans les pixels. Certains marqueurs techniques
+comme `L` ou `PORTABLE` peuvent rester visibles et doivent être mentionnés comme
+marqueurs non directement identifiants. Cette revue ne remplace pas un contrôle
+humain systématique avant toute diffusion.
+
 ## Commande
 
 ```bash

@@ -1,7 +1,7 @@
 PYTHON3 ?= python3
 VENV_PYTHON := .venv/bin/python
 
-.PHONY: setup test check ingest-help rsna-extract-help inference-help webapp-help webapp-setup webapp-run
+.PHONY: setup test check ingest-help rsna-extract-help inference-help evaluate-help evaluate-run webapp-help webapp-setup webapp-run
 
 $(VENV_PYTHON):
 	$(PYTHON3) -m venv .venv
@@ -24,6 +24,14 @@ rsna-extract-help: setup
 
 inference-help: setup
 	$(VENV_PYTHON) -m src.inference --help
+
+evaluate-help: setup
+	$(VENV_PYTHON) -m eval.evaluate --help
+
+evaluate-run: setup
+	$(VENV_PYTHON) -m eval.evaluate \
+		--predictions-dir data/predictions/baseline_v1 \
+		--output-dir eval/outputs/baseline_v1
 
 webapp-help: setup
 	$(VENV_PYTHON) -m src.webapp --help

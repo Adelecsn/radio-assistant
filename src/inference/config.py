@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass
 class InferenceConfig:
     """Configuration for the deterministic image-statistics baseline."""
 
-    model_version: str = "image-stat-baseline-v0.1"
+    model_version: str = "image-stat-baseline-v0.2"
     prompt_version: str = "v1.0"
     confidence_threshold: float = 0.60
     opacity_threshold: float = 0.72
@@ -18,6 +18,12 @@ class InferenceConfig:
     min_foreground_ratio: float = 0.20
     bright_pixel_threshold: int = 205
     edge_threshold: float = 16.0
+    normal_asymmetry_max: float = 0.07
+    normal_central_bright_max: float = 0.36
+    normal_edge_density_max: float = 0.026
+    opacity_asymmetry_min: float = 0.22
+    opacity_central_bright_min: float = 0.28
+    opacity_edge_density_min: float = 0.032
 
     def __post_init__(self) -> None:
         ratio_fields = {
@@ -25,6 +31,12 @@ class InferenceConfig:
             "opacity_threshold": self.opacity_threshold,
             "normal_threshold": self.normal_threshold,
             "min_foreground_ratio": self.min_foreground_ratio,
+            "normal_asymmetry_max": self.normal_asymmetry_max,
+            "normal_central_bright_max": self.normal_central_bright_max,
+            "normal_edge_density_max": self.normal_edge_density_max,
+            "opacity_asymmetry_min": self.opacity_asymmetry_min,
+            "opacity_central_bright_min": self.opacity_central_bright_min,
+            "opacity_edge_density_min": self.opacity_edge_density_min,
         }
         for name, value in ratio_fields.items():
             if not 0 <= value <= 1:

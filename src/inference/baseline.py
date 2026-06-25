@@ -49,6 +49,57 @@ def _scores(features: ImageFeatures, config: InferenceConfig) -> tuple[float, fl
     return opacity_score, normal_score
 
 
+def _decision_from_thresholds(
+    features: ImageFeatures,
+    config: InferenceConfig,
+) -> tuple[str, float, str]:
+    """Return class, confidence and reason from explicit baseline thresholds."""
+    normal_match = (
+        features.horizontal_asymmetry <= config.normal_asymmetry_max
+        and features.central_bright_ratio <= config.normal_central_bright_max
+        and features.edge_density <= config.normal_edge_density_max
+    )
+    if normal_match:
+        asymmetry_margin = config.normal_asymmetry_max - features.horizontal_asymmetry
+        bright_margin = config.normal_central_bright_max - features.central_bright_ratio
+        edge_margin = config.normal_edge_density_max - features.edge_density
+        confidence = config.confidence_threshold + min(
+            0.24,
+            0.8 * asymmetry_margin + 0.25 * bright_margin + 3.0 * edge_margin,
+        )
+        return (
+            "normal",
+            _clamp(confidence, config.confidence_threshold, 0.84),
+            "asymétrie, signal clair central et contours sous les seuils normaux",
+        )
+
+    opacity_match = (
+        features.horizontal_asymmetry >= config.opacity_asymmetry_min
+        or features.central_bright_ratio >= config.opacity_central_bright_min
+        or features.edge_density >= config.opacity_edge_density_min
+    )
+    if opacity_match:
+        asymmetry_signal = _clamp(features.horizontal_asymmetry / config.opacity_asymmetry_min, 0, 1)
+        bright_signal = _clamp(
+            features.central_bright_ratio / config.opacity_central_bright_min,
+            0,
+            1,
+        )
+        edge_signal = _clamp(features.edge_density / config.opacity_edge_density_min, 0, 1)
+        confidence = config.confidence_threshold + (0.28 * max(asymmetry_signal, bright_signal, edge_signal))
+        return (
+            "suspected_opacity",
+            _clamp(confidence, config.confidence_threshold, 0.88),
+            "au moins un seuil de signal clair, asymétrie ou contours est dépassé",
+        )
+
+    return (
+        "uncertain",
+        min(config.confidence_threshold - 0.01, 0.59),
+        "mesures situées entre les seuils normal et opacité",
+    )
+
+
 def _findings(predicted_class: str, quality: str, features: ImageFeatures) -> list[str]:
     findings = [
         f"Contraste mesuré: écart-type {features.std_intensity:.1f}.",
@@ -80,23 +131,15 @@ def predict_image(
     quality_reasons = _quality_reasons(features, active_config)
     image_quality = "poor" if quality_reasons else "good"
 
-    opacity_score, normal_score = _scores(features, active_config)
     if image_quality == "poor":
         predicted_class = "uncertain"
         confidence_score = min(active_config.confidence_threshold - 0.01, 0.45)
         decision_reason = "; ".join(quality_reasons)
-    elif opacity_score >= active_config.opacity_threshold:
-        predicted_class = "suspected_opacity"
-        confidence_score = _clamp(opacity_score, active_config.confidence_threshold, 0.88)
-        decision_reason = "score d'opacité supérieur au seuil baseline"
-    elif normal_score >= active_config.normal_threshold:
-        predicted_class = "normal"
-        confidence_score = _clamp(normal_score, active_config.confidence_threshold, 0.86)
-        decision_reason = "score normal supérieur au seuil baseline"
     else:
-        predicted_class = "uncertain"
-        confidence_score = min(active_config.confidence_threshold - 0.01, 0.59)
-        decision_reason = "scores baseline trop proches des seuils"
+        predicted_class, confidence_score, decision_reason = _decision_from_thresholds(
+            features,
+            active_config,
+        )
 
     latency_ms = int(round((perf_counter() - started) * 1000))
     prediction: dict[str, Any] = {
