@@ -16,8 +16,11 @@ reste du projet et les tests tournent sans GPU.
 ## Prérequis
 
 - un **compte Hugging Face** ;
-- **accepter la licence** du modèle `google/medgemma-4b-pt` (Health AI Developer
-  Foundations) sur sa page Hugging Face ;
+- **accepter la licence** du modèle `google/medgemma-4b-it` (Health AI Developer
+  Foundations) sur sa page Hugging Face — c'est la variante **instruction-tuned**,
+  seule à fournir le *chat template* requis par le backend. La variante `-pt`
+  (pré-entraînée) n'a pas de chat template et ferait basculer toutes les sorties
+  vers `uncertain` ;
 - un **token Hugging Face** (`Settings > Access Tokens`, droit *read*) ;
 - matériel : **GPU recommandé** (≈ 8–10 Go VRAM en bfloat16). Sur CPU ça fonctionne
   mais c'est lent ; réserver à 2–3 images de démonstration.
@@ -31,7 +34,7 @@ pip install -r requirements.txt   # inclut torch, transformers, accelerate, hugg
 
 ## Étape 2 — Accepter la licence du modèle
 
-Ouvrir <https://huggingface.co/google/medgemma-4b-pt>, se connecter, puis cliquer
+Ouvrir <https://huggingface.co/google/medgemma-4b-it>, se connecter, puis cliquer
 sur **« Agree and access repository »**. Sans cette étape, le téléchargement renvoie
 une erreur 401/403.
 
@@ -114,6 +117,7 @@ charge le modèle (lent), les suivants réutilisent le cache.
 | `CUDA out of memory` | VRAM insuffisante | `--device cpu`, ou réduire le lot |
 | Très lent | exécution CPU | normal ; limiter à quelques images |
 | `predicted_class: uncertain` partout | JSON modèle invalide | garde-fou volontaire ; vérifier le prompt et la latence |
+| `does not have a chat template` | variante `-pt` utilisée au lieu de `-it` | utiliser `google/medgemma-4b-it` (défaut actuel) et accepter sa licence |
 
 ## Position honnête
 

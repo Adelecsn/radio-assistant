@@ -29,10 +29,15 @@ class InferenceConfig:
     uncertainty_margin: float = 0.04
     local_texture_min: float = 38.0
     # MedGemma variant only: VLM backend knobs (ignored by statistical variants).
-    medgemma_model_id: str = "google/medgemma-4b-pt"
+    # The instruction-tuned ("-it") checkpoint is required: it ships the chat
+    # template the backend relies on (apply_chat_template). The pre-trained
+    # ("-pt") checkpoint has no chat template and would fall back to uncertain.
+    medgemma_model_id: str = "google/medgemma-4b-it"
     prompt_path: str = "prompts/baseline_v1.txt"
     device: str = "auto"
-    max_new_tokens: int = 512
+    # 768 (vs 512) leaves room for the full JSON object: at 512 the generation was
+    # occasionally truncated mid-object, forcing a parse fall-back to ``uncertain``.
+    max_new_tokens: int = 768
 
     ALLOWED_VARIANTS = ("baseline", "improved", "medgemma")
 
@@ -51,7 +56,7 @@ class InferenceConfig:
     def medgemma(cls, **overrides: object) -> "InferenceConfig":
         """Build a MedGemma vision-language backend configuration."""
         defaults: dict[str, object] = {
-            "model_version": "google/medgemma-4b-pt",
+            "model_version": "google/medgemma-4b-it",
             "prompt_version": "medgemma-v1.0",
             "variant": "medgemma",
         }

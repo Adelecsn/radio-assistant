@@ -140,7 +140,7 @@ contrat JSON.
 Le plafond mesuré des features globales justifie une **vraie baseline multimodale**.
 Elle est désormais **branchée** : la variante `medgemma`
 ([`src/inference/medgemma.py`](../src/inference/medgemma.py)) exécute
-`google/medgemma-4b-pt` derrière le même contrat JSON, avec bascule automatique vers
+`google/medgemma-4b-it` derrière le même contrat JSON, avec bascule automatique vers
 `uncertain` si la sortie est invalide. Deux prompts versionnés permettent l'ablation
 (`prompts/baseline_v1.txt` vs `prompts/improved_v1.txt`), et `eval.compare` produit la
 comparaison chiffrée prompt-vs-prompt ou MedGemma-vs-baseline statistique.
