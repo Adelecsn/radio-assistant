@@ -29,7 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--model-id",
         default=None,
-        help="MedGemma only: Hugging Face model id (default google/medgemma-4b-pt).",
+        help="MedGemma only: Hugging Face model id (default google/medgemma-4b-it).",
     )
     parser.add_argument(
         "--device",

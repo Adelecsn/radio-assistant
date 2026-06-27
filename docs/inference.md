@@ -60,7 +60,7 @@ rappel `normal`. Comparaison chiffrée : `python -m eval.compare`. Détails dans
 ## Backend multimodal MedGemma
 
 La variante `medgemma` (`src/inference/medgemma.py`) branche le vrai modèle
-vision-langage `google/medgemma-4b-pt` derrière le **même contrat**. Le modèle
+vision-langage `google/medgemma-4b-it` derrière le **même contrat**. Le modèle
 propose les champs cliniques ; le code impose l'avertissement, les versions, la
 latence et la **bascule vers `uncertain`** si le JSON est invalide, la qualité
 `poor` ou la confiance trop faible. Les dépendances (`torch`/`transformers`) sont
