@@ -11,7 +11,12 @@ import numpy as np
 from PIL import Image
 
 from src.contracts import is_valid_prediction
-from src.inference import InferenceConfig, predict_image, run_batch_inference
+from src.inference import (
+    InferenceConfig,
+    predict_image,
+    predict_image_improved,
+    run_batch_inference,
+)
 
 
 def _normal_like_image(path: Path) -> None:
@@ -20,6 +25,14 @@ def _normal_like_image(path: Path) -> None:
     values = 70 + np.clip(radius / 256, 0, 1) * 80
     texture = ((rows % 17) - 8) * 2
     Image.fromarray(np.clip(values + texture, 0, 255).astype(np.uint8)).save(path)
+
+
+def _smooth_low_texture_image(path: Path) -> None:
+    """Normal-looking globally, but homogeneous (low local contrast)."""
+    rows, cols = np.indices((512, 512))
+    radius = np.sqrt((rows - 256) ** 2 + (cols - 256) ** 2)
+    values = 70 + np.clip(radius / 256, 0, 1) * 90
+    Image.fromarray(np.clip(values, 0, 255).astype(np.uint8)).save(path)
 
 
 def _opacity_like_image(path: Path) -> None:
@@ -83,6 +96,47 @@ def test_bright_asymmetric_signal_can_be_flagged_by_baseline(tmp_path: Path) -> 
     assert result.prediction["predicted_class"] == "suspected_opacity"
 
 
+def test_improved_variant_is_valid_and_versioned(tmp_path: Path) -> None:
+    image_path = tmp_path / "image.png"
+    _normal_like_image(image_path)
+
+    result = predict_image_improved(image_path)
+
+    assert is_valid_prediction(result.prediction)
+    assert result.prediction["model_version"] == "image-stat-improved-v0.3"
+    assert result.prediction["prompt_version"] == "v2.0"
+    assert "local_texture_max" in result.features
+
+
+def test_local_texture_guardrail_reflags_homogeneous_normal(tmp_path: Path) -> None:
+    image_path = tmp_path / "smooth.png"
+    _smooth_low_texture_image(image_path)
+
+    baseline = predict_image(image_path)
+    improved = predict_image_improved(image_path)
+
+    assert baseline.prediction["predicted_class"] == "normal"
+    assert improved.prediction["predicted_class"] == "suspected_opacity"
+    assert is_valid_prediction(improved.prediction)
+
+
+def test_batch_inference_improved_variant(tmp_path: Path) -> None:
+    image_path = tmp_path / "processed" / "images" / "case_test.png"
+    image_path.parent.mkdir(parents=True)
+    _smooth_low_texture_image(image_path)
+    manifest = tmp_path / "manifests" / "ingest.csv"
+    _write_manifest(manifest, image_path)
+
+    result = run_batch_inference(
+        manifest, tmp_path / "predictions", config=InferenceConfig.improved()
+    )
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+
+    assert result.processed == 1
+    assert metadata["hyperparameters"]["variant"] == "improved"
+    assert metadata["hyperparameters"]["model_version"] == "image-stat-improved-v0.3"
+
+
 def test_batch_inference_writes_json_outputs(tmp_path: Path) -> None:
     image_path = tmp_path / "processed" / "images" / "case_test.png"
     image_path.parent.mkdir(parents=True)
@@ -129,3 +183,34 @@ def test_inference_cli_runs_end_to_end(tmp_path: Path) -> None:
     payload = json.loads(completed.stdout)
     assert payload["processed"] == 1
     assert Path(payload["index_path"]).exists()
+
+
+def test_inference_cli_improved_variant(tmp_path: Path) -> None:
+    image_path = tmp_path / "processed" / "images" / "case_test.png"
+    image_path.parent.mkdir(parents=True)
+    _normal_like_image(image_path)
+    manifest = tmp_path / "manifests" / "ingest.csv"
+    _write_manifest(manifest, image_path)
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "src.inference",
+            "--variant",
+            "improved",
+            "--manifest",
+            str(manifest),
+            "--output-dir",
+            str(tmp_path / "predictions"),
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    metadata = json.loads(
+        (tmp_path / "predictions" / "run_metadata.json").read_text(encoding="utf-8")
+    )
+    assert metadata["hyperparameters"]["variant"] == "improved"

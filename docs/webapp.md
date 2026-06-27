@@ -43,6 +43,11 @@ Options :
 ## Pages et routes
 
 - `/` : dashboard HTML ;
+- `/upload` : formulaire de dépôt d'image (PNG, JPEG ou DICOM) ;
+- `POST /predict` : analyse live de l'image uploadée (prétraitement + inférence)
+  et journalisation SQLite ;
+- `/uploads/{case_id}/image` : image PNG prétraitée d'un upload ;
+- `/about` : périmètre, source RSNA, limites et prochaines étapes ;
 - `/cases/{case_id}` : détail d'un cas avec warning, prédiction, features et
   JSON complet ;
 - `/cases/{case_id}/image` : image PNG prétraitée si elle est disponible ;
@@ -52,6 +57,15 @@ Options :
 - `/api/evaluation` : rapport d'évaluation JSON ;
 - `/api/evaluation/errors.csv` : registre d'erreurs CSV ;
 - `/api/cases` : liste JSON des cas.
+
+## Upload et inférence live
+
+Le dépôt d'image (`/upload` → `POST /predict`) réutilise le prétraitement
+d'ingestion puis l'inférence. La variante utilisée est choisie par
+`--variant` (par défaut `improved`). L'identifiant du cas est un condensé du
+contenu de l'image, jamais un nom de fichier ; les images uploadées prétraitées
+restent dans `logs/uploads/` (hors Git). Chaque analyse crée une ligne dans la
+table SQLite `inference_events` (classe, qualité, confiance, versions, latence).
 
 ## Données affichées
 
@@ -74,14 +88,17 @@ versions modèle/prompt et date de consultation.
 
 ## Limites actuelles
 
-- pas encore d'upload direct depuis l'interface ;
-- pas encore de comparaison avancée baseline vs modèle amélioré ;
-- dépend des sorties générées au préalable par `src.inference`.
+- le dashboard (hors page upload) dépend des sorties générées au préalable par
+  `src.inference` ;
+- la comparaison baseline vs amélioration est produite par `eval.compare` et le
+  notebook `03_baseline_vs_improved.ipynb`, pas encore intégrée comme page web ;
+- inférence statistique non clinique : voir limites du rapport.
 
 ## Critère de fin de l'étape 3
 
 - le dashboard lit les sorties JSON existantes ;
 - le warning non clinique est visible ;
+- l'upload d'image produit une analyse live conforme au contrat ;
 - les détails par cas sont consultables ;
-- chaque vue de cas crée une ligne SQLite ;
-- les tests couvrent lecture, rendu et journalisation.
+- chaque vue de cas et chaque upload créent une ligne SQLite ;
+- les tests couvrent lecture, rendu, upload live et journalisation.

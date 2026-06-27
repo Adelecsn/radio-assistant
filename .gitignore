@@ -232,6 +232,7 @@ __marimo__/
 /logs/*.sqlite
 /logs/*.sqlite3
 /logs/*.db
+/logs/uploads/
 *.safetensors
 *.ckpt
 *.pt
