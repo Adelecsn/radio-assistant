@@ -56,6 +56,21 @@ Les prédictions par cas sont écrites dans `cases/`, l'index dans
 baseline sert à tester le workflow IA; elle ne constitue pas un modèle médical.
 La procédure est détaillée dans [`docs/inference.md`](docs/inference.md).
 
+Une variante améliorée (`--variant improved`) ajoute un signal auxiliaire de
+texture locale et une règle d'incertitude pour supprimer les faux négatifs
+dangereux (opacité lue comme normale) :
+
+```bash
+python -m src.inference --variant improved \
+  --manifest data/manifests/ingest_manifest.csv \
+  --output-dir data/predictions/improved_v1
+```
+
+Un backend multimodal **MedGemma** (`--variant medgemma`) est branché derrière le
+même contrat JSON, avec bascule automatique vers `uncertain` si la sortie est
+invalide. Il nécessite un compte Hugging Face et l'acceptation de la licence du
+modèle : voir le guide pas à pas [`docs/medgemma.md`](docs/medgemma.md).
+
 ## Étape 3 - Webapp et dataviz
 
 La troisième brique lit les sorties JSON de l'inférence, affiche un dashboard
@@ -70,7 +85,9 @@ python -m src.webapp \
 
 Interface par défaut : <http://127.0.0.1:8000>. Le dashboard montre le warning,
 les compteurs par classe, la qualité image, les cas, les features et le JSON
-complet par cas. Les détails sont dans [`docs/webapp.md`](docs/webapp.md).
+complet par cas. La page `/upload` permet de **déposer une image** (PNG, JPEG ou
+DICOM) et d'obtenir une analyse live conforme au contrat, journalisée en SQLite.
+Les détails sont dans [`docs/webapp.md`](docs/webapp.md).
 
 ## Étape 4 - Évaluation
 
@@ -92,11 +109,29 @@ Sorties générées :
 Ces métriques servent à analyser la baseline. Elles ne constituent pas une
 validation médicale.
 
-La baseline actuelle est `image-stat-baseline-v0.2`. Elle reste une baseline
-statistique non clinique, mais elle corrige le défaut initial où la classe
-`normal` n'était jamais prédite. Sur l'échantillon local RSNA de 30 cas, elle
-obtient environ 70 % d'accuracy et 70 % de macro-F1. Ces chiffres sont indicatifs
-et calculés sur un petit échantillon de démonstration.
+La baseline actuelle est `image-stat-baseline-v0.2`. Sur l'échantillon local RSNA
+de 30 cas, elle obtient environ 70 % d'accuracy et 70 % de macro-F1.
+
+### Comparaison baseline vs amélioration
+
+La variante `image-stat-improved-v0.3` est comparée à la baseline sur les **mêmes**
+30 cas :
+
+```bash
+python -m eval.compare \
+  --baseline-dir data/predictions/baseline_v1 \
+  --improved-dir data/predictions/improved_v1 \
+  --output-dir eval/outputs/comparison
+```
+
+Gain mesuré : accuracy 0.70 → **0.77**, macro-F1 0.70 → **0.76**, sensibilité
+`suspected_opacity` 0.70 → **0.90**, et faux négatifs dangereux (opacité→normal)
+**2 → 0**, sans dégrader le rappel `normal`. Détails, hypothèse et décision dans
+[`docs/rapport.md`](docs/rapport.md). Notebooks reproductibles :
+[`notebooks/`](notebooks/) (`02_baseline.ipynb`, `03_baseline_vs_improved.ipynb`).
+
+Ces chiffres sont indicatifs, calculés sur un petit échantillon de démonstration,
+et ne constituent pas une validation médicale.
 
 ## Organisation
 
@@ -298,6 +333,12 @@ La revue visuelle des erreurs est disponible ici :
 
 ```text
 http://127.0.0.1:8000/errors
+```
+
+La page de synthèse du périmètre et des limites est disponible ici :
+
+```text
+http://127.0.0.1:8000/about
 ```
 
 Installer les dépendances web minimales :

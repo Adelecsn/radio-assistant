@@ -13,8 +13,35 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run baseline inference on an ingest manifest.")
     parser.add_argument("--manifest", required=True, help="Path to the ingestion manifest CSV.")
     parser.add_argument("--output-dir", required=True, help="Directory for JSON predictions.")
-    parser.add_argument("--model-version", default=InferenceConfig.model_version)
-    parser.add_argument("--prompt-version", default=InferenceConfig.prompt_version)
+    parser.add_argument(
+        "--variant",
+        choices=InferenceConfig.ALLOWED_VARIANTS,
+        default="baseline",
+        help="'baseline', 'improved' (texture guardrail) or 'medgemma' (VLM backend).",
+    )
+    parser.add_argument("--model-version", default=None)
+    parser.add_argument("--prompt-version", default=None)
+    parser.add_argument(
+        "--prompt-file",
+        default=None,
+        help="MedGemma only: system prompt file (default prompts/baseline_v1.txt).",
+    )
+    parser.add_argument(
+        "--model-id",
+        default=None,
+        help="MedGemma only: Hugging Face model id (default google/medgemma-4b-pt).",
+    )
+    parser.add_argument(
+        "--device",
+        default=None,
+        help="MedGemma only: device_map, e.g. 'auto', 'cuda', 'cpu'.",
+    )
+    parser.add_argument(
+        "--max-new-tokens",
+        type=int,
+        default=None,
+        help="MedGemma only: generation budget.",
+    )
     parser.add_argument(
         "--confidence-threshold",
         type=float,
@@ -43,18 +70,39 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_parser().parse_args()
-    config = InferenceConfig(
-        model_version=args.model_version,
-        prompt_version=args.prompt_version,
-        confidence_threshold=args.confidence_threshold,
-        opacity_threshold=args.opacity_threshold,
-        normal_threshold=args.normal_threshold,
-        poor_quality_std_threshold=args.poor_quality_std_threshold,
-        min_foreground_ratio=args.min_foreground_ratio,
-        bright_pixel_threshold=args.bright_pixel_threshold,
-        edge_threshold=args.edge_threshold,
-    )
-    result = run_batch_inference(args.manifest, args.output_dir, config=config)
+    overrides: dict[str, object] = {
+        "confidence_threshold": args.confidence_threshold,
+        "opacity_threshold": args.opacity_threshold,
+        "normal_threshold": args.normal_threshold,
+        "poor_quality_std_threshold": args.poor_quality_std_threshold,
+        "min_foreground_ratio": args.min_foreground_ratio,
+        "bright_pixel_threshold": args.bright_pixel_threshold,
+        "edge_threshold": args.edge_threshold,
+    }
+    if args.model_version is not None:
+        overrides["model_version"] = args.model_version
+    if args.prompt_version is not None:
+        overrides["prompt_version"] = args.prompt_version
+
+    if args.variant == "medgemma":
+        if args.prompt_file is not None:
+            overrides["prompt_path"] = args.prompt_file
+        if args.model_id is not None:
+            overrides["medgemma_model_id"] = args.model_id
+            overrides.setdefault("model_version", args.model_id)
+        if args.device is not None:
+            overrides["device"] = args.device
+        if args.max_new_tokens is not None:
+            overrides["max_new_tokens"] = args.max_new_tokens
+        config = InferenceConfig.medgemma(**overrides)
+    elif args.variant == "improved":
+        config = InferenceConfig.improved(**overrides)
+    else:
+        config = InferenceConfig(**overrides)
+    try:
+        result = run_batch_inference(args.manifest, args.output_dir, config=config)
+    except RuntimeError as error:
+        raise SystemExit(f"Erreur d'inférence: {error}")
     print(
         json.dumps(
             {

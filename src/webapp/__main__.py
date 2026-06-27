@@ -19,6 +19,17 @@ def build_parser() -> argparse.ArgumentParser:
         default="logs/webapp.sqlite",
         help="SQLite database used to log local consultations.",
     )
+    parser.add_argument(
+        "--variant",
+        choices=("baseline", "improved", "medgemma"),
+        default="improved",
+        help="Inference variant used for live uploads (POST /predict).",
+    )
+    parser.add_argument(
+        "--upload-dir",
+        default="logs/uploads",
+        help="Directory for preprocessed uploaded images (kept out of Git).",
+    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     return parser
@@ -33,7 +44,12 @@ def main() -> None:
             "uvicorn n'est pas installé. Installe requirements.txt pour lancer la webapp."
         ) from error
 
-    app = create_app(predictions_dir=args.predictions_dir, db_path=args.db_path)
+    app = create_app(
+        predictions_dir=args.predictions_dir,
+        db_path=args.db_path,
+        variant=args.variant,
+        upload_dir=args.upload_dir,
+    )
     uvicorn.run(app, host=args.host, port=args.port)
 
 

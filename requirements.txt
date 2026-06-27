@@ -1,5 +1,7 @@
 torch
 transformers
+accelerate
+huggingface_hub
 Pillow
 numpy
 pydicom

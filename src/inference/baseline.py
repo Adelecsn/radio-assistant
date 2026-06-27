@@ -116,6 +116,46 @@ def _findings(predicted_class: str, quality: str, features: ImageFeatures) -> li
     return findings
 
 
+def assemble_prediction(
+    *,
+    image_quality: str,
+    predicted_class: str,
+    confidence_score: float,
+    decision_reason: str,
+    features: ImageFeatures,
+    quality_reasons: list[str],
+    config: InferenceConfig,
+    latency_ms: int,
+    justification_prefix: str,
+) -> ImagePrediction:
+    """Build a contract-valid prediction shared by the baseline and improved variants."""
+    prediction: dict[str, Any] = {
+        "image_quality": image_quality,
+        "predicted_class": predicted_class,
+        "confidence_score": round(float(confidence_score), 3),
+        "visual_findings": _findings(predicted_class, image_quality, features),
+        "justification": f"{justification_prefix}: {decision_reason}.",
+        "limitations": [
+            "Baseline sans segmentation anatomique, sans contexte clinique et sans entraînement médical.",
+            "Résultat destiné uniquement à tester le workflow logiciel.",
+        ],
+        "warning": WARNING_TEXT,
+        "model_version": config.model_version,
+        "prompt_version": config.prompt_version,
+        "inference_latency_ms": latency_ms,
+    }
+
+    errors = validate_prediction(prediction)
+    if errors:
+        raise ValueError(f"Internal inference output does not match the contract: {errors}")
+
+    return ImagePrediction(
+        prediction=prediction,
+        features=features.to_dict(),
+        quality_reasons=quality_reasons,
+    )
+
+
 def predict_image(
     image_path: str | Path,
     config: InferenceConfig | None = None,
@@ -142,31 +182,14 @@ def predict_image(
         )
 
     latency_ms = int(round((perf_counter() - started) * 1000))
-    prediction: dict[str, Any] = {
-        "image_quality": image_quality,
-        "predicted_class": predicted_class,
-        "confidence_score": round(float(confidence_score), 3),
-        "visual_findings": _findings(predicted_class, image_quality, features),
-        "justification": (
-            "Décision produite par une baseline statistique non clinique: "
-            f"{decision_reason}."
-        ),
-        "limitations": [
-            "Baseline sans segmentation anatomique, sans contexte clinique et sans entraînement médical.",
-            "Résultat destiné uniquement à tester le workflow logiciel.",
-        ],
-        "warning": WARNING_TEXT,
-        "model_version": active_config.model_version,
-        "prompt_version": active_config.prompt_version,
-        "inference_latency_ms": latency_ms,
-    }
-
-    errors = validate_prediction(prediction)
-    if errors:
-        raise ValueError(f"Internal inference output does not match the contract: {errors}")
-
-    return ImagePrediction(
-        prediction=prediction,
-        features=features.to_dict(),
+    return assemble_prediction(
+        image_quality=image_quality,
+        predicted_class=predicted_class,
+        confidence_score=confidence_score,
+        decision_reason=decision_reason,
+        features=features,
         quality_reasons=quality_reasons,
+        config=active_config,
+        latency_ms=latency_ms,
+        justification_prefix="Décision produite par une baseline statistique non clinique",
     )

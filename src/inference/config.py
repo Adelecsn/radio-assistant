@@ -11,6 +11,7 @@ class InferenceConfig:
 
     model_version: str = "image-stat-baseline-v0.2"
     prompt_version: str = "v1.0"
+    variant: str = "baseline"
     confidence_threshold: float = 0.60
     opacity_threshold: float = 0.72
     normal_threshold: float = 0.72
@@ -24,8 +25,50 @@ class InferenceConfig:
     opacity_asymmetry_min: float = 0.22
     opacity_central_bright_min: float = 0.28
     opacity_edge_density_min: float = 0.032
+    # Improved variant only: guardrail knobs (ignored by the baseline).
+    uncertainty_margin: float = 0.04
+    local_texture_min: float = 38.0
+    # MedGemma variant only: VLM backend knobs (ignored by statistical variants).
+    medgemma_model_id: str = "google/medgemma-4b-pt"
+    prompt_path: str = "prompts/baseline_v1.txt"
+    device: str = "auto"
+    max_new_tokens: int = 512
+
+    ALLOWED_VARIANTS = ("baseline", "improved", "medgemma")
+
+    @classmethod
+    def improved(cls, **overrides: object) -> "InferenceConfig":
+        """Build the improved guardrail-vote configuration."""
+        defaults: dict[str, object] = {
+            "model_version": "image-stat-improved-v0.3",
+            "prompt_version": "v2.0",
+            "variant": "improved",
+        }
+        defaults.update(overrides)
+        return cls(**defaults)  # type: ignore[arg-type]
+
+    @classmethod
+    def medgemma(cls, **overrides: object) -> "InferenceConfig":
+        """Build a MedGemma vision-language backend configuration."""
+        defaults: dict[str, object] = {
+            "model_version": "google/medgemma-4b-pt",
+            "prompt_version": "medgemma-v1.0",
+            "variant": "medgemma",
+        }
+        defaults.update(overrides)
+        return cls(**defaults)  # type: ignore[arg-type]
 
     def __post_init__(self) -> None:
+        if self.variant not in self.ALLOWED_VARIANTS:
+            raise ValueError(f"variant must be one of {self.ALLOWED_VARIANTS}")
+        if not 0 <= self.uncertainty_margin <= 0.4:
+            raise ValueError("uncertainty_margin must be between 0 and 0.4")
+        if self.local_texture_min < 0:
+            raise ValueError("local_texture_min must be non-negative")
+        if self.max_new_tokens <= 0:
+            raise ValueError("max_new_tokens must be positive")
+        if not str(self.prompt_path).strip():
+            raise ValueError("prompt_path must be non-empty")
         ratio_fields = {
             "confidence_threshold": self.confidence_threshold,
             "opacity_threshold": self.opacity_threshold,

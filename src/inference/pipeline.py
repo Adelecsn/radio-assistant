@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .baseline import predict_image
 from .config import InferenceConfig
+from .improved import predict_case
 
 
 @dataclass(frozen=True)
@@ -78,7 +78,7 @@ def run_batch_inference(
             continue
 
         try:
-            result = predict_image(image_path, active_config)
+            result = predict_case(image_path, active_config)
         except (OSError, ValueError):
             rejected += 1
             continue
