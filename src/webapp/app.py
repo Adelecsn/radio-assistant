@@ -27,6 +27,8 @@ def create_app(
     *,
     variant: str = "improved",
     upload_dir: str | Path = "logs/uploads",
+    prompt_path: str | None = None,
+    prompt_version: str | None = None,
 ):
     """Create the local dashboard application."""
     try:
@@ -44,7 +46,15 @@ def create_app(
     if variant == "improved":
         live_config = InferenceConfig.improved()
     elif variant == "medgemma":
-        live_config = InferenceConfig.medgemma()
+        # Live MedGemma needs a prompt that names the JSON fields, otherwise the
+        # model returns keys we don't expect and every upload falls back to
+        # uncertain. Default to baseline_v1 but allow overriding via the CLI.
+        medgemma_overrides: dict[str, object] = {}
+        if prompt_path:
+            medgemma_overrides["prompt_path"] = prompt_path
+        if prompt_version:
+            medgemma_overrides["prompt_version"] = prompt_version
+        live_config = InferenceConfig.medgemma(**medgemma_overrides)
     else:
         live_config = InferenceConfig()
     uploads = Path(upload_dir)
