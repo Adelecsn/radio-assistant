@@ -30,6 +30,17 @@ def build_parser() -> argparse.ArgumentParser:
         default="logs/uploads",
         help="Directory for preprocessed uploaded images (kept out of Git).",
     )
+    parser.add_argument(
+        "--prompt-file",
+        default=None,
+        help="MedGemma live uploads only: system prompt file. Use "
+        "prompts/improved_v1.txt for real predictions (baseline_v1 returns uncertain).",
+    )
+    parser.add_argument(
+        "--prompt-version",
+        default=None,
+        help="MedGemma live uploads only: prompt version label logged with events.",
+    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     return parser
@@ -49,6 +60,8 @@ def main() -> None:
         db_path=args.db_path,
         variant=args.variant,
         upload_dir=args.upload_dir,
+        prompt_path=args.prompt_file,
+        prompt_version=args.prompt_version,
     )
     uvicorn.run(app, host=args.host, port=args.port)
 

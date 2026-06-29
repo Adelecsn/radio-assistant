@@ -37,7 +37,7 @@ def test_parse_valid_output_preserves_clinical_fields() -> None:
     assert prediction["predicted_class"] == "suspected_opacity"
     assert prediction["visual_findings"] == ["opacité du lobe inférieur droit"]
     assert prediction["warning"] == WARNING_TEXT
-    assert prediction["model_version"] == "google/medgemma-4b-pt"
+    assert prediction["model_version"] == "google/medgemma-4b-it"
     assert prediction["prompt_version"] == "medgemma-v1.0"
     assert prediction["inference_latency_ms"] == 1200
 
